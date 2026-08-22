@@ -1,15 +1,18 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/currency.dart';
 import '../models/expense.dart';
 import '../models/person.dart';
 import '../models/settlement.dart';
-import 'dart:math';
 
 class ExpenseProvider with ChangeNotifier {
   List<Person> _people = [];
   List<Expense> _expenses = [];
-  String _currency = '\$';
+  Currency _selectedCurrency = Currency.defaultCurrency;
+  bool _hasCompletedOnboarding = false;
+  bool _isInitialized = false;
 
   ExpenseProvider() {
     _loadData();
@@ -17,7 +20,10 @@ class ExpenseProvider with ChangeNotifier {
 
   List<Person> get people => _people;
   List<Expense> get expenses => _expenses;
-  String get currency => _currency;
+  String get currency => _selectedCurrency.symbol;
+  Currency get selectedCurrency => _selectedCurrency;
+  bool get hasCompletedOnboarding => _hasCompletedOnboarding;
+  bool get isInitialized => _isInitialized;
 
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
@@ -32,7 +38,18 @@ class ExpenseProvider with ChangeNotifier {
       _expenses = expensesJson.map((e) => Expense.fromJson(json.decode(e))).toList();
     }
     
-    _currency = prefs.getString('currency') ?? '\$';
+    final savedCode = prefs.getString('currency_code');
+    final savedSymbol = prefs.getString('currency');
+    if (savedCode != null) {
+      _selectedCurrency = Currency.findByCode(savedCode, savedSymbol);
+    } else if (savedSymbol != null) {
+      _selectedCurrency = Currency.findBySymbol(savedSymbol);
+    } else {
+      _selectedCurrency = Currency.defaultCurrency;
+    }
+
+    _hasCompletedOnboarding = prefs.getBool('has_completed_onboarding') ?? false;
+    _isInitialized = true;
     
     notifyListeners();
   }
@@ -46,18 +63,46 @@ class ExpenseProvider with ChangeNotifier {
     final expensesJson = _expenses.map((e) => json.encode(e.toJson())).toList();
     await prefs.setStringList('expenses', expensesJson);
 
-    await prefs.setString('currency', _currency);
+    await prefs.setString('currency', _selectedCurrency.symbol);
+    await prefs.setString('currency_code', _selectedCurrency.code);
+    await prefs.setBool('has_completed_onboarding', _hasCompletedOnboarding);
   }
 
-  void setCurrency(String currency) {
-    _currency = currency;
+  void setCurrency(Currency newCurrency) {
+    _selectedCurrency = newCurrency;
     _saveData();
     notifyListeners();
   }
 
+  void setCurrencyBySymbol(String symbol) {
+    _selectedCurrency = Currency.findBySymbol(symbol);
+    _saveData();
+    notifyListeners();
+  }
+
+  Future<void> completeOnboarding() async {
+    _hasCompletedOnboarding = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('has_completed_onboarding', true);
+    notifyListeners();
+  }
+
   void addPerson(String name) {
-    if (name.trim().isNotEmpty) {
-      _people.add(Person(name: name.trim()));
+    final trimmed = name.trim();
+    if (trimmed.isNotEmpty) {
+      _people.add(Person(name: trimmed));
+      _saveData();
+      notifyListeners();
+    }
+  }
+
+  void updatePerson(String id, String newName) {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) return;
+
+    final index = _people.indexWhere((p) => p.id == id);
+    if (index != -1) {
+      _people[index] = Person(id: id, name: trimmed);
       _saveData();
       notifyListeners();
     }
@@ -114,12 +159,14 @@ class ExpenseProvider with ChangeNotifier {
       }
       balances[expense.paidById] = balances[expense.paidById]! + expense.amount;
 
-      double splitAmount = expense.amount / expense.splitAmongIds.length;
-      for (var splitId in expense.splitAmongIds) {
-        if (!balances.containsKey(splitId)) {
-          balances[splitId] = 0.0;
+      if (expense.splitAmongIds.isNotEmpty) {
+        double splitAmount = expense.amount / expense.splitAmongIds.length;
+        for (var splitId in expense.splitAmongIds) {
+          if (!balances.containsKey(splitId)) {
+            balances[splitId] = 0.0;
+          }
+          balances[splitId] = balances[splitId]! - splitAmount;
         }
-        balances[splitId] = balances[splitId]! - splitAmount;
       }
     }
 

@@ -5,6 +5,7 @@ import 'providers/expense_provider.dart';
 import 'screens/home_page.dart';
 import 'screens/participants_page.dart';
 import 'screens/settlement_page.dart';
+import 'screens/onboarding_page.dart';
 import 'services/ad_service.dart';
 import 'widgets/banner_ad_widget.dart';
 
@@ -24,7 +25,7 @@ class ExpenseTrackerApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ExpenseProvider()),
       ],
       child: MaterialApp(
-        title: 'Expense Tracker',
+        title: 'Expense Tracker & Settlement',
         theme: ThemeData(
           brightness: Brightness.dark,
           scaffoldBackgroundColor: const Color(0xFF0F172A),
@@ -42,14 +43,38 @@ class ExpenseTrackerApp extends StatelessWidget {
           ),
           cardTheme: CardThemeData(
             color: const Color(0xFF1E293B),
-            elevation: 8,
+            elevation: 6,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
         ),
-        home: const MainScreen(),
+        home: const AppRootRouter(),
         debugShowCheckedModeBanner: false,
       ),
     );
+  }
+}
+
+class AppRootRouter extends StatelessWidget {
+  const AppRootRouter({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<ExpenseProvider>();
+
+    if (!provider.isInitialized) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F172A),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF3B82F6)),
+        ),
+      );
+    }
+
+    if (!provider.hasCompletedOnboarding) {
+      return const OnboardingPage();
+    }
+
+    return const MainScreen();
   }
 }
 
@@ -82,26 +107,41 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Banner Ad sits just above the navigation bar ──
+          // Banner Ad sits just above the navigation bar
           const BannerAdWidget(),
-          BottomNavigationBar(
-            items: const <BottomNavigationBarItem>[
-              BottomNavigationBarItem(
-                icon: Icon(Icons.list_alt),
-                label: 'Expenses',
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A),
+              border: Border(
+                top: BorderSide(color: Colors.white.withOpacity(0.06)),
               ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.people),
-                label: 'Participants',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.account_balance_wallet),
-                label: 'Settlement',
-              ),
-            ],
-            currentIndex: _selectedIndex,
-            selectedItemColor: Colors.teal,
-            onTap: _onItemTapped,
+            ),
+            child: BottomNavigationBar(
+              backgroundColor: const Color(0xFF0F172A),
+              selectedItemColor: const Color(0xFF3B82F6),
+              unselectedItemColor: Colors.grey[500],
+              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+              unselectedLabelStyle: const TextStyle(fontSize: 12),
+              items: const <BottomNavigationBarItem>[
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.receipt_long_outlined),
+                  activeIcon: Icon(Icons.receipt_long),
+                  label: 'Expenses',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.people_outline),
+                  activeIcon: Icon(Icons.people),
+                  label: 'Participants',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.account_balance_wallet_outlined),
+                  activeIcon: Icon(Icons.account_balance_wallet),
+                  label: 'Settlement',
+                ),
+              ],
+              currentIndex: _selectedIndex,
+              onTap: _onItemTapped,
+            ),
           ),
         ],
       ),

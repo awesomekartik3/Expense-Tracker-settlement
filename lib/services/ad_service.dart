@@ -3,9 +3,9 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 class AdService {
   // ─── TEST IDs (replace with real AdMob IDs before publishing) ───────────────
   static const String _bannerAdUnitId =
-      'ca-app-pub-3940256099942544/6300978111'; // Test banner
+      'ca-app-pub-5520747342583144/1567159654'; // Real banner
   static const String _interstitialAdUnitId =
-      'ca-app-pub-3940256099942544/1033173712'; // Test interstitial
+      'ca-app-pub-5520747342583144/2780897929'; // Real interstitial
 
   // ─── Singleton ───────────────────────────────────────────────────────────────
   AdService._();
